@@ -1,0 +1,5 @@
+#! /bin/bash
+
+npm start &
+
+./node_modules/nodemon/bin/nodemon.js --ignore sessions server.js --exec node

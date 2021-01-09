@@ -1,0 +1,13 @@
+npm init
+
+npm install body-parser express express-session mithril nodemon session-file-store chess.js socket.io webpack webpack-cli --save
+
+# put this command in "scripts" in package.json:
+#    "start": "npx webpack --config conf/webpack.config.js --watch"
+
+# run server like so:
+PORT=12345 ./fireup
+
+# if PORT not specified, then port is 3007
+
+

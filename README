@@ -1,0 +1,51 @@
+./setup
+    first time setup instructions
+
+./fireup
+    compiles and puts client, runs server; watches for any changes to client or server source files and auto recompiles/restarts
+
+./client.js
+    this is the client source file. It gets compiled by webpack during "npm start" script in package.json, and result file is ./static/bin/app.js
+
+./static
+    this folder is the root folder of the website. Contains index.html which basically is a wrapper for bin/app.js compiled from client.js
+
+./static/lib
+    place for js files needed by both server and client
+
+./static/lib/game.js
+    contains class def of Game, needed by both server and client
+
+./static/bin
+    contains app.js, built by webpack from client.js
+
+./static/index.html
+    currently a wrapper for the bin/app.js, but also includes from cdn all the various 3rd party js libs, css, etc.
+
+./static/css
+
+./static/css/game.css
+    currently has styles from the FICS webapp that are not used, but some styles are used like the ones to highlight the last move squares, etc
+
+./conf
+
+./conf/webpack.config.js
+    conf for how webpack compiles client.js into static/bin/app.js and listens for changes
+
+./server.js
+    express server, websocket server, file server, game server
+
+./static/img
+    chess pieces
+
+./static/sound
+    sounds
+
+./static/textures
+    board backgrounds
+
+./sessions
+    sessions
+
+
+
