@@ -4,7 +4,7 @@ sock = io();
 var root = document.body;
 
 
-default_themes = [
+var default_themes = [
     {"name":"cop","light_rgba":{"r":255,"g":255,"b":255,"a":0.09},"dark_rgba":{"r":255,"g":255,"b":255,"a":0},"texture":"brushed-copper.jpg","white_pieces":"alpha","black_pieces":"alpha"},
     {"name":"fire","dark_rgba":{"r":0,"g":0,"b":0,"a":0.74},"light_rgba":{"r":253.57,"g":132.59,"b":33.14,"a":0.72},"texture":"Fire-Flames-Background-11-625x468.jpg","white_pieces":"chesscom","black_pieces":"chesscom"},
     {"name":"hunjies","dark_rgba":{"r":48.43,"g":101.82,"b":21.71,"a":0.81},"light_rgba":{"r":245.46,"g":244.67,"b":241.70,"a":0.79},"texture":"Money-Background-17-625x625.jpg","white_pieces":"uscf","black_pieces":"uscf"},
@@ -17,6 +17,14 @@ default_themes = [
     {"name":"wawa","dark_rgba":{"r":2.847,"g":0,"b":255,"a":0.43},"light_rgba":{"r":239.01,"g":235.93,"b":224.24,"a":0.07},"texture":"blue-rippled-water-background-in-swimming-pool_1373-193.jpg","white_pieces":"uscf","black_pieces":"chess24"},
     {"name":"wood","dark_rgba":{"r":91.31,"g":28.09,"b":28.09,"a":0.75},"light_rgba":{"r":176.12,"g":238.45,"b":103.1,"a":0.2},"texture":"antique-wooden-planks-texture_1232-824.jpg","white_pieces":"chesscom","black_pieces":"alpha"}]
 
+
+var soundmap = {
+    ambience: [],
+    gong: [],
+    moves: [],
+    captures: [],
+    checks: []
+};
 
 
 function loadThemes() {
@@ -38,93 +46,20 @@ function highlightSquares(board_div, color, move=null, clear=false) {
 }
 
 
-var MainMenu = {
-    view : function(vnode) {
-        return m('ul', [
-            m('li' , m('button', {
-                            onclick: (e) => {
-                                sock.emit('message','nutbagholee');
-                               m.request({
-                                   method: 'POST',
-                                   url: '/api/seek',
-                               })
-                               .then( res => {
-                                   m.route.set('/seeklist');
-                               })
-                               .catch( e => console.log('erererererer'));
-                               return false;
-                            }
-                        },
-                        'seek game')),
-            m('li' , m('button', {onclick: (e) => m.route.set('/seeklist')}, 'see seeks')),
-            m('li' , m('button', 'games')),
-            m('li' , m('button', 'players')),
-        ]);
-    }
-    
-}
-
-
-var SeekList = {
-	seeks: [],
-    refresh : function(vnode) {
-        m.request({
-            method: 'GET',
-            url: '/api/getSeeks',
-        })
-        .then( res => {
-            SeekList.seeks = res.seeks;
-        })
-        .catch( e => console.log('ERRORRRRRR:',e) );
-    },
-
-    onupdate: function(vnode) {
-        console.log('in SeekList onupdate');
-        console.log(SeekList.games);
-    },
-
-    oninit : function (vnode) {
-        SeekList.refresh(vnode);
-    },
-
-    // show list of seeks, either yours or others
-    view : function(vnode) {
-        return m('ul', SeekList.seeks.map( seeker => {
-                return m('li' , m('a', {
-                            onclick: (e) => {
-                               m.request({
-                                   method: 'POST',
-                                   url: '/api/accept',
-                                   body: {seeker: seeker}
-                               })
-                               .then( res => {
-                                   //m.route.set('/board');
-                               })
-                               .catch( e => console.log('erererererer'));
-                               return false;
-                            }
-                        },
-                            seeker))
-                        }));
-    }
-}
-
-var GameList = {
-    // show a game list
-}
-
+sock.on('error', function(msg) {
+    console.log('in sock on error!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+    console.log(msg);
+});
 
 sock.on('game_info', function(msg) {
     console.log('in sock on game_info');
     console.log(msg);
-    //Board.game_info = msg;
-    //m.route.set('/board');
     Boards.addGame(msg);
     m.route.set('/boards');
 });
 
-sock.on('fen', function(msg) {
-    console.log('in sock on fen');
+sock.on('move_info', function(msg) {
+    console.log('in sock on move_info');
     console.log(msg);
 
     var game_num = msg[0];
@@ -206,9 +141,89 @@ sock.on('fen', function(msg) {
     }
 });
 
+sock.on('soundmap', function(msg) {
+    var result = msg;
+    for (i=0; i<result.ambience.length; i++) {
+        soundmap.ambience.push( new Howl({ src: ['/sound/ambience/' + result.ambience[i]] }) );
+    }
+    for (i=0; i<result.gong.length; i++) {
+        soundmap.gong.push( new Howl({ src: ['/sound/gong/' + result.gong[i]] }) );
+    }
+    for (i=0; i<result.moves.length; i++) {
+        soundmap.moves.push( new Howl({ src: ['/sound/moves/' + result.moves[i]] }) );
+    }
+    for (i=0; i<result.captures.length; i++) {
+        soundmap.captures.push( new Howl({ src: ['/sound/captures/' + result.captures[i]] }) );
+    }
+    for (i=0; i<result.checks.length; i++) {
+        soundmap.checks.push( new Howl({ src: ['/sound/checks/' + result.checks[i]] }) );
+    }
+})
+
+sock.on('login_success', function(msg) {
+    console.log('in sock on login_success');
+    console.log(msg);
+
+    Cookies.set('username', msg, {expires: 30000});
+
+    sock.emit('get','soundmap');
+
+    m.route.set('/mainmenu');
+});
+
+sock.on('seek_list', function(msg) {
+    console.log('in sock.on seek_list');
+    console.log(msg);
+    SeekList.seeks = msg;
+    m.redraw()
+});
+
+var MainMenu = {
+    view : function(vnode) {
+        return m('ul', [
+            m('li' , m('button', {
+                            onclick: (e) => {
+                                sock.emit('message','nutbagholee');
+                                sock.emit('seek', 'standard blitz or whatever');
+                                return false;
+                            }
+                        },
+                        'seek game')),
+            m('li' , m('button', {onclick: (e) => m.route.set('/seeklist')}, 'see seeks')),
+            m('li' , m('button', 'games')),
+            m('li' , m('button', 'players')),
+        ]);
+    }
+    
+}
 
 
+var SeekList = {
+	seeks: [],
+    onupdate: function(vnode) {
+        console.log('in SeekList onupdate');
+        console.log(SeekList.seeks);
+        //sock.emit('get', 'seeks');
+    },
 
+    oninit : function (vnode) {
+        console.log('in SeekList oninit');
+        console.log(SeekList.seeks);
+        sock.emit('get', 'seeks');
+    },
+
+    view : function(vnode) {
+        return m('ul', SeekList.seeks.map( seeker => {
+                return m('li' , m('a', {
+                            onclick: (e) => {
+                                sock.emit('accept',seeker);
+                                return false;
+                            }
+                        },
+                            seeker))
+                        }));
+    }
+}
 
 
 
@@ -462,47 +477,8 @@ var Boards = {
                         )
                     })
         );
-
-        /*
-        return m("div", {"class":"clearfix","id":"games_div"}, 
-                    Array.from(Boards.games.values(), g => {
-                        m("div", {"class":"clearfix observe","id":"observe_"+g.game_num},
-                            [
-                                m("div", {"class":"player_name","id":"top_player_"+g.game_num}, 
-                                    g.black_player
-                                    //"emCkew (1370)"
-                                ),
-                                m("div", {"class":"board_info_container"}, 
-                                    m("div", {"class":"board","id":"board_"+g.game_num}, 
-                                    )
-                                ),
-                                m("div", {"class":"player_name","id":"bottom_player_"+g.game_num}, 
-                                    g.white_player
-                                    //"zigamo (1348)"
-                                )
-                            ]
-                        )
-        })
-
-        ));
-        */
     }
 }
-
-
-
-
-var PlayerList = {
-    // show list o players
-}
-
-var soundmap = {
-    ambience: [],
-    gong: [],
-    moves: [],
-    captures: [],
-    checks: []
-};
 
 var Login = {
     username : '',
@@ -516,41 +492,7 @@ var Login = {
            m('tr', [
                m('td', {colspan: 2, align: 'center'}, 
                    m('button',  {onclick: (e) => {
-                            m.request({
-                                method: 'POST',
-                                url: '/api/login',
-                                body: {username: Login.username, sockid: sock.id}
-                            })
-                            .then( res => {
-                                Cookies.set('username', Login.username, {expires: 30000});
-                                m.request({
-                                    method: 'GET',
-                                    url: "/soundmap", 
-                                })
-                                .then( result => {
-                                    //console.log(result);
-                                    //result = JSON.parse(result);
-                                    for (i=0; i<result.ambience.length; i++) {
-                                        soundmap.ambience.push( new Howl({ src: ['/sound/ambience/' + result.ambience[i]] }) );
-                                    }
-                                    for (i=0; i<result.gong.length; i++) {
-                                        soundmap.gong.push( new Howl({ src: ['/sound/gong/' + result.gong[i]] }) );
-                                    }
-                                    for (i=0; i<result.moves.length; i++) {
-                                        soundmap.moves.push( new Howl({ src: ['/sound/moves/' + result.moves[i]] }) );
-                                    }
-                                    for (i=0; i<result.captures.length; i++) {
-                                        soundmap.captures.push( new Howl({ src: ['/sound/captures/' + result.captures[i]] }) );
-                                    }
-                                    for (i=0; i<result.checks.length; i++) {
-                                        soundmap.checks.push( new Howl({ src: ['/sound/checks/' + result.checks[i]] }) );
-                                    }
-                                    m.route.set('/mainmenu');
-                                })
-
-
-                           })
-                           .catch( e => console.log('erererererer'));
+                           sock.emit('login', {username: Login.username, password: ''});
                            return false;
                        }
                    }, 'login')
@@ -560,6 +502,16 @@ var Login = {
     }
 }
 
+
+
+
+var PlayerList = {
+    // show list o players
+}
+
+var GameList = {
+    // show a game list
+}
 
 
 m.route(root, "/login", {

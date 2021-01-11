@@ -25,7 +25,7 @@ function random_string(len) {
 }
 
 
-var g_sock_map = new Map(); // (sockid, {socket:socket, games: [[gnum, color],...]} )
+var g_sock_map = new Map(); // (sockid, {socket:socket, games: [[gnum, color],...], username:'name'} )
 var g_player_sockid_map = new Map(); // (username, sockid)
 var g_seeks = []; // usernames
 var g_game_map = new Map();  // (gnum, Game)
@@ -53,6 +53,7 @@ app.use(session( {
     store : new FileStore(),
 }))
 
+/*
 app.use( function(req, resp, next) {
     if (req.url.startsWith('/api/login')) { next(); return; }
 
@@ -69,128 +70,9 @@ app.use( function(req, resp, next) {
 app.get('/api/showsess', (req,res) => {
     res.send(req.session);
 });
-
-app.post('/api/login', function (req, res) {
-    var username = strip(req.body.username);
-    var bad_re = /[^a-zA-Z0-9 _]+/
-    if ( !username ) {
-        res.send({error: 'username cannot be blank'});
-        return;
-    }
-    if ( bad_re.test(username) ) {
-        res.send({error: 'only alphanumeric and underscore allowed'});
-        return;
-    }
-
-    req.session.player = username;
-    req.session.save();
-    g_player_sockid_map.set(username, req.body.sockid); 
-
-    res.send({message: 'success'});
-    return;
-})
-
-app.post('/api/seek', (req,res) => {
-    g_seeks.push(req.session.player);
-    res.send({message:'added a seek'});
-    // websocket send seek to update client seek list
-});
-
-app.get('/api/getSeeks', (req,res) => {
-    res.send({seeks: g_seeks});
-});
-
-app.post('/api/accept', (req,res) => {
-    var seeker = req.body.seeker;
-    var seeker_index = g_seeks.indexOf(seeker);
-    if ( seeker_index == -1 ) {
-        res.send({error: 'somehow name not in list'});
-        return;
-    }
-    g_seeks.splice(seeker_index, 1);
-
-    var accepter = req.session.player;
-    
-    var black, white;
-    
-    if ( Math.floor(Math.random() * 2) == 1 ) {
-        white = seeker;
-        black = accepter;
-    } else {
-        black = seeker;
-        white = accepter;
-    }
-    
-    var game_num = random_string(8);
-    while ( g_game_map.has(game_num) ) {
-        game_num = random_string(8);
-    }
-    
-    var game_info = {
-        game_num: game_num,
-        situ: 'IN PROGRESS',
-        result: '', //1-0, 0-1, 1/2-1/2
-        white_player: white,
-        black_player: black,
-        white_rating: '----',
-        black_rating: '----',
-        runr: 'Unrated',
-        variant: 'Correspondence',
-        time: 0.0,
-        inc: 0,
-    }
+*/
 
 
-    g_game_map.set(game_num, new Game(game_info));
-    var g = g_game_map.get(game_num);
-    g.chess = new Chess();
-
-    g.chess.header(
-            'Event', g.time + " + " + g.inc + " " + g.runr + " " + g.variant,
-            'White', g.white_player,
-            'Black', g.black_player, 
-            'TimeControl', g.time + '+' + g.inc,
-            'WhiteElo', g.white_rating,
-            'BlackElo', g.black_rating
-            );
-
-    g.startfen = g.chess.fen().split(/\s+/)[0];
-
-    g.movetimes = [];
-    g.fens = [];
-                                                              
-    g.current_move_index = g.chess.history().length - 1;
-    g_game_map.set(game_num, g);
-    
-    g_gnum_sockids_map.set(game_num, []);
-    /*
-     //hopefully will not need this
-    if ( req.session.player == white ) {
-        game_info.human_color = 'w';
-    } else if ( req.session.player == black ) {
-        game_info.human_color = 'b';
-    }
-    */
-
-    [seeker, accepter].map( p => {
-        var color = p === white ? 'w' : 'b';
-        var sockid = g_player_sockid_map.get(p);
-        var sock_info = g_sock_map.get(sockid);
-        sock_info.games.push([game_num, color]);
-        sock_info.socket.emit('game_info',game_info);
-        g_gnum_sockids_map.get(game_num).push(sockid);
-    } )
-
-    res.send({data: 'game accepted'});
-});
-
-app.post('/api/move', (req,res) => {
-    /*
-     * args: gameid, move
-     * use sessid and do the move
-     * return new board state or if illegal
-     */
-});
 
 
 app.get('/txtlist', function (req, res) {
@@ -248,6 +130,7 @@ app.get('/soundmap', function (req, res) {
     })
 })
 
+
 var port = process.env.PORT || 3007;
 const http = require('http').Server(app);
 
@@ -267,6 +150,180 @@ io.on('connection', function(socket) {
         console.log(socket.id);
         console.log(msg);
     });
+
+    socket.on('seek', function(msg) {
+        g_seeks.push(g_sock_map.get(socket.id).username);
+        console.log('in socket.on seek');
+        console.log('g_seeks is')
+        console.log(g_seeks);
+        Array.from(g_sock_map.keys()).map( sockid => {
+            g_sock_map.get(sockid).socket.emit('seek_list', g_seeks);
+        });
+    });
+
+
+
+
+    socket.on('accept', function(msg) {
+        console.log('in socket.on accept');
+
+        var seeker = msg;
+        console.log('seeker');
+        console.log(seeker);
+        console.log('g_seeks');
+        console.log(g_seeks);
+        var seeker_index = g_seeks.indexOf(seeker);
+        if ( seeker_index == -1 ) {
+            // res.send({error: 'somehow name not in list'});
+            g_sock_map.get(socket.id).socket.emit('error', 'somehow name not in list');
+            return;
+        }
+        g_seeks.splice(seeker_index, 1);
+
+        var accepter = g_sock_map.get(socket.id).username;
+        
+        var black, white;
+        
+        if ( Math.floor(Math.random() * 2) == 1 ) {
+            white = seeker;
+            black = accepter;
+        } else {
+            black = seeker;
+            white = accepter;
+        }
+        
+        var game_num = random_string(8);
+        while ( g_game_map.has(game_num) ) {
+            game_num = random_string(8);
+        }
+        
+        var game_info = {
+            game_num: game_num,
+            situ: 'IN PROGRESS',
+            result: '', //1-0, 0-1, 1/2-1/2
+            white_player: white,
+            black_player: black,
+            white_rating: '----',
+            black_rating: '----',
+            runr: 'Unrated',
+            variant: 'Correspondence',
+            time: 0.0,
+            inc: 0,
+        }
+
+
+        g_game_map.set(game_num, new Game(game_info));
+        var g = g_game_map.get(game_num);
+        g.chess = new Chess();
+
+        g.chess.header(
+                'Event', g.time + " + " + g.inc + " " + g.runr + " " + g.variant,
+                'White', g.white_player,
+                'Black', g.black_player, 
+                'TimeControl', g.time + '+' + g.inc,
+                'WhiteElo', g.white_rating,
+                'BlackElo', g.black_rating
+                );
+
+        g.startfen = g.chess.fen().split(/\s+/)[0];
+
+        g.movetimes = [];
+        g.fens = [];
+                                                                  
+        g.current_move_index = g.chess.history().length - 1;
+        g_game_map.set(game_num, g);
+        
+        g_gnum_sockids_map.set(game_num, []);
+        /*
+         //hopefully will not need this
+        if ( req.session.player == white ) {
+            game_info.human_color = 'w';
+        } else if ( req.session.player == black ) {
+            game_info.human_color = 'b';
+        }
+        */
+
+        [seeker, accepter].map( p => {
+            var color = p === white ? 'w' : 'b';
+            var sockid = g_player_sockid_map.get(p);
+            var sock_info = g_sock_map.get(sockid);
+            sock_info.games.push([game_num, color]);
+            sock_info.socket.emit('game_info',game_info);
+            g_gnum_sockids_map.get(game_num).push(sockid);
+        } )
+
+    });
+
+
+    socket.on('get', function(msg) {
+        console.log('in socket.on message');
+        console.log(socket.id);
+        console.log(msg);
+        if (msg === 'soundmap') {
+            var obj = {};
+            obj.ambience= [];
+            obj.gong= [];
+            obj.moves = [];
+            obj.captures = [];
+            obj.checks = [];
+            fs.readdir(staticroot + '/sound/ambience', (err, files) => {
+                if (files) files.forEach(file => {
+                    obj.ambience.push(file);
+                });
+                fs.readdir(staticroot + '/sound/gong', (err, files) => {
+                    if (files) files.forEach(file => {
+                        obj.gong.push(file);
+                    });
+                    fs.readdir(staticroot + '/sound/moves', (err, files) => {
+                        if (files) files.forEach(file => {
+                            obj.moves.push(file);
+                        });
+                        fs.readdir(staticroot + '/sound/captures', (err, files) => {
+                            if (files) files.forEach(file => {
+                                obj.captures.push(file);
+                            });
+                            fs.readdir(staticroot + '/sound/checks', (err, files) => {
+                                if (files) files.forEach(file => {
+                                    obj.checks.push(file);
+                                });
+                                g_sock_map.get(socket.id).socket.emit('soundmap',obj);
+                            })
+                        })
+                    })
+                })
+            })
+        }
+        if (msg === 'seeks') {
+            console.log('in socket.on get seeks');
+            console.log('g_seeks');
+            console.log(g_seeks);
+            //send to everybody
+            g_sock_map.get(socket.id).socket.emit('seek_list',g_seeks);
+        }
+    });
+
+    socket.on('login', function(msg) {
+        console.log('in socket.on login');
+        console.log(socket.id);
+        console.log(msg);
+
+        var username = strip(msg.username);
+        var bad_re = /[^a-zA-Z0-9 _]+/
+        if ( !username ) {
+            g_sock_map.get(socket.id).socket.emit('error', 'username cannot be blank');
+            return;
+        }
+        if ( bad_re.test(username) ) {
+            g_sock_map.get(socket.id).socket.emit('error', 'only alphanumeric and underscore allowed');
+            return;
+        }
+        
+        g_sock_map.get(socket.id).username = username;
+        g_player_sockid_map.set(username, socket.id); 
+
+        g_sock_map.get(socket.id).socket.emit('login_success', username);
+    });
+
     socket.on('move', function(msg) {
         // msg is [game.game_num, valid_move.from + '-' + valid_move.to]
         console.log('in socket.on move');
@@ -297,7 +354,7 @@ io.on('connection', function(socket) {
                     game.chess.move(mv, {sloppy:true});
                     //go thru all the sockets that are watching or playing this game
                     g_gnum_sockids_map.get(gnum).map( sockid => {
-                        g_sock_map.get(sockid).socket.emit('fen',[gnum, mv, game.chess.fen()]);
+                        g_sock_map.get(sockid).socket.emit('move_info',[gnum, mv]);
                         console.log(game.chess.fen());
                     });
                     break;
