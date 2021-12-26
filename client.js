@@ -44,6 +44,8 @@ var MainMenu = {
             m('li' , m('button', {
                             onclick: (e) => {
                                 sock.emit('message','nutbagholee');
+                                sock.emit('seek', 'standard blitz or whatever');
+                                /*
                                m.request({
                                    method: 'POST',
                                    url: '/api/seek',
@@ -52,6 +54,7 @@ var MainMenu = {
                                    m.route.set('/seeklist');
                                })
                                .catch( e => console.log('erererererer'));
+                                */
                                return false;
                             }
                         },
@@ -74,6 +77,8 @@ var SeekList = {
         })
         .then( res => {
             SeekList.seeks = res.seeks;
+            console.log('SeekList.seeks');
+            console.log(SeekList.seeks);
         })
         .catch( e => console.log('ERRORRRRRR:',e) );
     },
@@ -206,7 +211,35 @@ sock.on('fen', function(msg) {
     }
 });
 
+sock.on('soundmap', function(msg) {
+    var result = msg;
+    for (i=0; i<result.ambience.length; i++) {
+        soundmap.ambience.push( new Howl({ src: ['/sound/ambience/' + result.ambience[i]] }) );
+    }
+    for (i=0; i<result.gong.length; i++) {
+        soundmap.gong.push( new Howl({ src: ['/sound/gong/' + result.gong[i]] }) );
+    }
+    for (i=0; i<result.moves.length; i++) {
+        soundmap.moves.push( new Howl({ src: ['/sound/moves/' + result.moves[i]] }) );
+    }
+    for (i=0; i<result.captures.length; i++) {
+        soundmap.captures.push( new Howl({ src: ['/sound/captures/' + result.captures[i]] }) );
+    }
+    for (i=0; i<result.checks.length; i++) {
+        soundmap.checks.push( new Howl({ src: ['/sound/checks/' + result.checks[i]] }) );
+    }
+})
 
+sock.on('login_success', function(msg) {
+    console.log('in sock on login_success');
+    console.log(msg);
+
+    Cookies.set('username', msg, {expires: 30000});
+
+    sock.emit('get','soundmap');
+
+    m.route.set('/mainmenu');
+});
 
 
 
@@ -516,41 +549,7 @@ var Login = {
            m('tr', [
                m('td', {colspan: 2, align: 'center'}, 
                    m('button',  {onclick: (e) => {
-                            m.request({
-                                method: 'POST',
-                                url: '/api/login',
-                                body: {username: Login.username, sockid: sock.id}
-                            })
-                            .then( res => {
-                                Cookies.set('username', Login.username, {expires: 30000});
-                                m.request({
-                                    method: 'GET',
-                                    url: "/soundmap", 
-                                })
-                                .then( result => {
-                                    //console.log(result);
-                                    //result = JSON.parse(result);
-                                    for (i=0; i<result.ambience.length; i++) {
-                                        soundmap.ambience.push( new Howl({ src: ['/sound/ambience/' + result.ambience[i]] }) );
-                                    }
-                                    for (i=0; i<result.gong.length; i++) {
-                                        soundmap.gong.push( new Howl({ src: ['/sound/gong/' + result.gong[i]] }) );
-                                    }
-                                    for (i=0; i<result.moves.length; i++) {
-                                        soundmap.moves.push( new Howl({ src: ['/sound/moves/' + result.moves[i]] }) );
-                                    }
-                                    for (i=0; i<result.captures.length; i++) {
-                                        soundmap.captures.push( new Howl({ src: ['/sound/captures/' + result.captures[i]] }) );
-                                    }
-                                    for (i=0; i<result.checks.length; i++) {
-                                        soundmap.checks.push( new Howl({ src: ['/sound/checks/' + result.checks[i]] }) );
-                                    }
-                                    m.route.set('/mainmenu');
-                                })
-
-
-                           })
-                           .catch( e => console.log('erererererer'));
+                           sock.emit('login', {username: Login.username, password: ''});
                            return false;
                        }
                    }, 'login')

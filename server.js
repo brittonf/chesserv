@@ -25,7 +25,7 @@ function random_string(len) {
 }
 
 
-var g_sock_map = new Map(); // (sockid, {socket:socket, games: [[gnum, color],...]} )
+var g_sock_map = new Map(); // (sockid, {socket:socket, games: [[gnum, color],...], username:'name'} )
 var g_player_sockid_map = new Map(); // (username, sockid)
 var g_seeks = []; // usernames
 var g_game_map = new Map();  // (gnum, Game)
@@ -53,6 +53,7 @@ app.use(session( {
     store : new FileStore(),
 }))
 
+/*
 app.use( function(req, resp, next) {
     if (req.url.startsWith('/api/login')) { next(); return; }
 
@@ -64,6 +65,7 @@ app.use( function(req, resp, next) {
     }
     next();
 });
+*/
 
 
 app.get('/api/showsess', (req,res) => {
@@ -97,6 +99,9 @@ app.post('/api/seek', (req,res) => {
 });
 
 app.get('/api/getSeeks', (req,res) => {
+    console.log('in /api/getSeeks');
+    console.log('g_seeks');
+    console.log(g_seeks);
     res.send({seeks: g_seeks});
 });
 
@@ -267,6 +272,82 @@ io.on('connection', function(socket) {
         console.log(socket.id);
         console.log(msg);
     });
+
+    socket.on('seek', function(msg) {
+        g_seeks.push(g_sock_map.get(socket.id).username);
+        //res.send({message:'added a seek'});
+    });
+
+    socket.on('get', function(msg) {
+        console.log('in socket.on message');
+        console.log(socket.id);
+        console.log(msg);
+        if (msg === 'soundmap') {
+
+
+
+            var obj = {};
+            obj.ambience= [];
+            obj.gong= [];
+            obj.moves = [];
+            obj.captures = [];
+            obj.checks = [];
+            fs.readdir(staticroot + '/sound/ambience', (err, files) => {
+                if (files) files.forEach(file => {
+                    obj.ambience.push(file);
+                });
+                fs.readdir(staticroot + '/sound/gong', (err, files) => {
+                    if (files) files.forEach(file => {
+                        obj.gong.push(file);
+                    });
+                    fs.readdir(staticroot + '/sound/moves', (err, files) => {
+                        if (files) files.forEach(file => {
+                            obj.moves.push(file);
+                        });
+                        fs.readdir(staticroot + '/sound/captures', (err, files) => {
+                            if (files) files.forEach(file => {
+                                obj.captures.push(file);
+                            });
+                            fs.readdir(staticroot + '/sound/checks', (err, files) => {
+                                if (files) files.forEach(file => {
+                                    obj.checks.push(file);
+                                });
+                                //res.send(JSON.stringify(obj))
+                                g_sock_map.get(socket.id).socket.emit('soundmap',obj);
+                            })
+                        })
+                    })
+                })
+            })
+
+
+
+
+        }
+    });
+
+    socket.on('login', function(msg) {
+        console.log('in socket.on login');
+        console.log(socket.id);
+        console.log(msg);
+
+        var username = strip(msg.username);
+        var bad_re = /[^a-zA-Z0-9 _]+/
+        if ( !username ) {
+            g_sock_map.get(socket.id).socket.emit('error', 'username cannot be blank');
+            return;
+        }
+        if ( bad_re.test(username) ) {
+            g_sock_map.get(socket.id).socket.emit('error', 'only alphanumeric and underscore allowed');
+            return;
+        }
+        
+        g_sock_map.get(socket.id).username = username;
+        g_player_sockid_map.set(username, socket.id); 
+
+        g_sock_map.get(socket.id).socket.emit('login_success', username);
+    });
+
     socket.on('move', function(msg) {
         // msg is [game.game_num, valid_move.from + '-' + valid_move.to]
         console.log('in socket.on move');
