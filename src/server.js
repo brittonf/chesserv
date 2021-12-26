@@ -6,7 +6,7 @@ const FileStore = require('session-file-store')(session);
 
 const fs = require('fs');
 
-const Game = require('./static/lib/game.js').Game;
+const Game = require('./lib/game.js').Game;
 
 const Chess = require('chess.js').Chess;
 
@@ -39,7 +39,7 @@ const app = express();
 
 app.set('trust proxy', 'loopback');
 
-const staticroot = 'static';
+const staticroot = 'www';
 app.use(express.static(staticroot));
 
 app.use(bodyParser.json()); // support json encoded bodies
@@ -256,7 +256,7 @@ app.get('/soundmap', function (req, res) {
 var port = process.env.PORT || 3007;
 const http = require('http').Server(app);
 
-http.listen(port, function() {
+http.listen( port, '127.0.0.1', function() {
     console.log('listening on port ' + port);
 });
 
