@@ -3,6 +3,7 @@ const m = require('mithril')
 sock = io();
 var root = document.body;
 
+const Game = require('./lib/game.js').Game;
 
 default_themes = [
     {"name":"cop","light_rgba":{"r":255,"g":255,"b":255,"a":0.09},"dark_rgba":{"r":255,"g":255,"b":255,"a":0},"texture":"brushed-copper.jpg","white_pieces":"alpha","black_pieces":"alpha"},

@@ -1,10 +1,10 @@
 const path = require('path');
 
 module.exports = {
-  entry: './client.js',
+  entry: './src/client.js',
   mode: 'development',
   output: {
     filename: 'app.js',
-    path: path.resolve(__dirname, '../static/bin'),
+    path: path.resolve(__dirname, '../../../node-servers/nutz_server/www/bin'),
   },
 };
